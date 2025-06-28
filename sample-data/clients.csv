@@ -1,0 +1,9 @@
+ClientID,ClientName,PriorityLevel,RequestedTaskIDs,GroupTag,AttributesJSON
+C001,Acme Corporation,5,"T001,T002,T003",enterprise,"{""industry"": ""technology"", ""region"": ""north"", ""contract_value"": 500000}"
+C002,Global Solutions,4,"T002,T004",enterprise,"{""industry"": ""consulting"", ""region"": ""south"", ""contract_value"": 300000}"
+C003,StartupXYZ,3,"T001,T005",startup,"{""industry"": ""fintech"", ""region"": ""east"", ""contract_value"": 100000}"
+C004,Local Business,2,"T003",small,"{""industry"": ""retail"", ""region"": ""west"", ""contract_value"": 50000}"
+C005,Innovation Labs,4,"T004,T005,T006",enterprise,"{""industry"": ""research"", ""region"": ""central"", ""contract_value"": 400000}"
+C006,Quick Services,1,"T001",small,"{""industry"": ""services"", ""region"": ""north"", ""contract_value"": 25000}"
+C007,Data Corp,5,"T002,T003,T004,T005",enterprise,"{""industry"": ""data"", ""region"": ""east"", ""contract_value"": 750000}"
+C008,Green Energy,3,"T006",startup,"{""industry"": ""energy"", ""region"": ""west"", ""contract_value"": 150000}" 

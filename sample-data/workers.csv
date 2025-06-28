@@ -1,0 +1,11 @@
+WorkerID,WorkerName,Skills,AvailableSlots,MaxLoadPerPhase,WorkerGroup,QualificationLevel
+W001,John Smith,"programming,data_analysis,project_management","[1,2,3,4,5]",3,senior,5
+W002,Sarah Johnson,"programming,testing,agile","[1,2,4,5]",2,senior,4
+W003,Mike Davis,"data_analysis,statistics,ml","[2,3,4]",2,mid,3
+W004,Lisa Wang,"programming,frontend,ui_ux","[1,3,5]",2,mid,3
+W005,Alex Brown,"testing,qa,automation","[2,4,5]",1,junior,2
+W006,Emma Wilson,"data_analysis,reporting,excel","[1,2,3]",1,junior,2
+W007,David Lee,"programming,backend,database","[3,4,5]",2,senior,4
+W008,Maria Garcia,"project_management,agile,scrum","[1,2,3,4]",2,senior,4
+W009,Tom Anderson,"ml,ai,research","[2,3,4,5]",1,senior,5
+W010,Anna Kim,"frontend,ui_ux,design","[1,2,4,5]",2,mid,3 

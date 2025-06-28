@@ -1,0 +1,11 @@
+TaskID,TaskName,Category,Duration,RequiredSkills,PreferredPhases,MaxConcurrent
+T001,Frontend Development,development,3,"programming,frontend","[1,2,3]",2
+T002,Backend API Development,development,4,"programming,backend","[2,3,4]",2
+T003,Data Analysis Project,analysis,2,"data_analysis,statistics","[1,2]",1
+T004,Machine Learning Model,ml,5,"ml,ai,programming","[3,4,5]",1
+T005,Testing & QA,testing,2,"testing,qa","[4,5]",3
+T006,Project Management,management,3,"project_management,agile","[1,2,3]",1
+T007,UI/UX Design,design,2,"ui_ux,design","[1,2]",2
+T008,Database Optimization,database,2,"database,programming","[3,4]",1
+T009,Automation Scripts,automation,1,"automation,programming","[2,3]",2
+T010,Research & Documentation,research,2,"research,excel","[1,5]",1 
