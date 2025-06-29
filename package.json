@@ -26,9 +26,9 @@
     "openai": "^4.20.1",
     "papaparse": "^5.4.1",
     "postcss": "^8.4.32",
-    "react": "^18",
-    "react-data-grid": "^7.0.0-beta.25",
-    "react-dom": "^18",
+    "react": "^18.3.1",
+    "react-data-grid": "7.0.0-beta.25",
+    "react-dom": "^18.3.1",
     "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
     "tailwind-merge": "^2.0.0",
@@ -40,8 +40,8 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/papaparse": "^5.3.14",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
     "eslint": "^8",
     "eslint-config-next": "14.0.4",
     "typescript": "^5"
