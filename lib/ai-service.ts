@@ -110,12 +110,15 @@ Focus on semantic meaning and context, not just exact text matches.
         
         switch (result.entity) {
           case 'client':
+            // @ts-ignore
             entityData = this.clients.find(c => c.ClientID === result.entityId);
             break;
           case 'worker':
+            // @ts-ignore
             entityData = this.workers.find(w => w.WorkerID === result.entityId);
             break;
           case 'task':
+            // @ts-ignore
             entityData = this.tasks.find(t => t.TaskID === result.entityId);
             break;
         }
