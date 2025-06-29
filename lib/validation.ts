@@ -1,96 +1,65 @@
+
 import { Client, Worker, Task, ValidationError, ValidationSummary } from './types';
 
 export class ValidationEngine {
-  private clients: Client[] = [];
-  private workers: Worker[] = [];
-  private tasks: Task[] = [];
-
-  constructor(clients: Client[], workers: Worker[], tasks: Task[]) {
-    this.clients = clients;
-    this.workers = workers;
-    this.tasks = tasks;
-  }
+  constructor(
+    private clients: Client[],
+    private workers: Worker[],
+    private tasks: Task[]
+  ) {}
 
   validateAll(): ValidationSummary {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationError[] = [];
-    const info: ValidationError[] = [];
+    const errors: ValidationError[] = [
+      ...this.validateClients(),
+      ...this.validateWorkers(),
+      ...this.validateTasks(),
+      ...this.validateCrossReferences()
+    ];
 
-    // Validate clients
-    errors.push(...this.validateClients());
-    warnings.push(...this.validateClientWarnings());
-    info.push(...this.validateClientInfo());
+    const warnings: ValidationError[] = [
+      ...this.clientWarnings(),
+      ...this.workerWarnings(),
+      ...this.taskWarnings(),
+      ...this.crossRefWarnings()
+    ];
 
-    // Validate workers
-    errors.push(...this.validateWorkers());
-    warnings.push(...this.validateWorkerWarnings());
-    info.push(...this.validateWorkerInfo());
+    const info: ValidationError[] = [
+      ...this.clientInfo(),
+      ...this.workerInfo(),
+      ...this.taskInfo()
+    ];
 
-    // Validate tasks
-    errors.push(...this.validateTasks());
-    warnings.push(...this.validateTaskWarnings());
-    info.push(...this.validateTaskInfo());
+    return { totalErrors: errors.length, totalWarnings: warnings.length, totalInfo: info.length, errors, warnings, info };
+  }
 
-    // Cross-reference validations
-    errors.push(...this.validateCrossReferences());
-    warnings.push(...this.validateCrossReferenceWarnings());
+  private findDuplicates(ids: string[]) {
+    return ids.filter((id, index) => ids.indexOf(id) !== index);
+  }
 
-    return {
-      totalErrors: errors.length,
-      totalWarnings: warnings.length,
-      totalInfo: info.length,
-      errors,
-      warnings,
-      info
-    };
+  private isValidJson(value: string) {
+    try { JSON.parse(value); return true; } catch { return false; }
+  }
+
+  private parseJsonArray(value: string): number[] | null {
+    try {
+      const arr = JSON.parse(value);
+      return Array.isArray(arr) ? arr.filter(v => typeof v === 'number' && v >= 1) : null;
+    } catch { return null; }
   }
 
   private validateClients(): ValidationError[] {
     const errors: ValidationError[] = [];
+    const ids = this.clients.map(c => c.ClientID);
+    this.findDuplicates(ids).forEach(id => errors.push({
+      type: 'error', message: `Duplicate ClientID: ${id}`, entity: 'client', entityId: id, field: 'ClientID', suggestion: 'Use unique ClientID'
+    }));
 
-    // Check for duplicate ClientIDs
-    const clientIds = this.clients.map(c => c.ClientID);
-    const duplicates = clientIds.filter((id, index) => clientIds.indexOf(id) !== index);
-    duplicates.forEach(id => {
-      errors.push({
-        type: 'error',
-        message: `Duplicate ClientID found: ${id}`,
-        entity: 'client',
-        entityId: id,
-        field: 'ClientID',
-        suggestion: 'Ensure each client has a unique ID'
-      });
-    });
-
-    // Validate PriorityLevel (1-5)
-    this.clients.forEach((client, index) => {
-      if (client.PriorityLevel < 1 || client.PriorityLevel > 5) {
-        errors.push({
-          type: 'error',
-          message: `PriorityLevel must be between 1 and 5, got ${client.PriorityLevel}`,
-          entity: 'client',
-          entityId: client.ClientID,
-          field: 'PriorityLevel',
-          row: index + 1,
-          suggestion: 'Set PriorityLevel to a value between 1 and 5'
-        });
+    this.clients.forEach((c, i) => {
+      if (c.PriorityLevel < 1 || c.PriorityLevel > 5) {
+        errors.push({ type: 'error', message: `PriorityLevel must be 1-5`, entity: 'client', entityId: c.ClientID, field: 'PriorityLevel', row: i + 1, suggestion: 'Set PriorityLevel between 1 and 5' });
       }
-    });
-
-    // Validate AttributesJSON
-    this.clients.forEach((client, index) => {
-      try {
-        JSON.parse(client.AttributesJSON);
-      } catch {
-        errors.push({
-          type: 'error',
-          message: 'Invalid JSON in AttributesJSON field',
-          entity: 'client',
-          entityId: client.ClientID,
-          field: 'AttributesJSON',
-          row: index + 1,
-          suggestion: 'Fix the JSON format in AttributesJSON'
-        });
+      if (!this.isValidJson(c.AttributesJSON)) {
+        errors.push({ type: 'error', message: 'Invalid AttributesJSON', entity: 'client', entityId: c.ClientID, field: 'AttributesJSON', row: i + 1, suggestion: 'Fix JSON format' });
       }
     });
 
@@ -99,58 +68,18 @@ export class ValidationEngine {
 
   private validateWorkers(): ValidationError[] {
     const errors: ValidationError[] = [];
+    const ids = this.workers.map(w => w.WorkerID);
+    this.findDuplicates(ids).forEach(id => errors.push({
+      type: 'error', message: `Duplicate WorkerID: ${id}`, entity: 'worker', entityId: id, field: 'WorkerID', suggestion: 'Use unique WorkerID'
+    }));
 
-    // Check for duplicate WorkerIDs
-    const workerIds = this.workers.map(w => w.WorkerID);
-    const duplicates = workerIds.filter((id, index) => workerIds.indexOf(id) !== index);
-    duplicates.forEach(id => {
-      errors.push({
-        type: 'error',
-        message: `Duplicate WorkerID found: ${id}`,
-        entity: 'worker',
-        entityId: id,
-        field: 'WorkerID',
-        suggestion: 'Ensure each worker has a unique ID'
-      });
-    });
-
-    // Validate AvailableSlots format
-    this.workers.forEach((worker, index) => {
-      try {
-        const slots = JSON.parse(worker.AvailableSlots);
-        if (!Array.isArray(slots)) {
-          throw new Error('Not an array');
-        }
-        slots.forEach(slot => {
-          if (typeof slot !== 'number' || slot < 1) {
-            throw new Error('Invalid slot number');
-          }
-        });
-      } catch {
-        errors.push({
-          type: 'error',
-          message: 'AvailableSlots must be a valid JSON array of positive integers',
-          entity: 'worker',
-          entityId: worker.WorkerID,
-          field: 'AvailableSlots',
-          row: index + 1,
-          suggestion: 'Format AvailableSlots as JSON array, e.g., [1,3,5]'
-        });
+    this.workers.forEach((w, i) => {
+      const slots = this.parseJsonArray(w.AvailableSlots);
+      if (!slots) {
+        errors.push({ type: 'error', message: 'Invalid AvailableSlots', entity: 'worker', entityId: w.WorkerID, field: 'AvailableSlots', row: i + 1, suggestion: 'Use valid JSON array e.g., [1,2,3]' });
       }
-    });
-
-    // Validate MaxLoadPerPhase
-    this.workers.forEach((worker, index) => {
-      if (worker.MaxLoadPerPhase < 1) {
-        errors.push({
-          type: 'error',
-          message: 'MaxLoadPerPhase must be at least 1',
-          entity: 'worker',
-          entityId: worker.WorkerID,
-          field: 'MaxLoadPerPhase',
-          row: index + 1,
-          suggestion: 'Set MaxLoadPerPhase to 1 or higher'
-        });
+      if (w.MaxLoadPerPhase < 1) {
+        errors.push({ type: 'error', message: 'MaxLoadPerPhase must be >= 1', entity: 'worker', entityId: w.WorkerID, field: 'MaxLoadPerPhase', row: i + 1, suggestion: 'Set MaxLoadPerPhase >= 1' });
       }
     });
 
@@ -159,49 +88,14 @@ export class ValidationEngine {
 
   private validateTasks(): ValidationError[] {
     const errors: ValidationError[] = [];
+    const ids = this.tasks.map(t => t.TaskID);
+    this.findDuplicates(ids).forEach(id => errors.push({
+      type: 'error', message: `Duplicate TaskID: ${id}`, entity: 'task', entityId: id, field: 'TaskID', suggestion: 'Use unique TaskID'
+    }));
 
-    // Check for duplicate TaskIDs
-    const taskIds = this.tasks.map(t => t.TaskID);
-    const duplicates = taskIds.filter((id, index) => taskIds.indexOf(id) !== index);
-    duplicates.forEach(id => {
-      errors.push({
-        type: 'error',
-        message: `Duplicate TaskID found: ${id}`,
-        entity: 'task',
-        entityId: id,
-        field: 'TaskID',
-        suggestion: 'Ensure each task has a unique ID'
-      });
-    });
-
-    // Validate Duration
-    this.tasks.forEach((task, index) => {
-      if (task.Duration < 1) {
-        errors.push({
-          type: 'error',
-          message: 'Duration must be at least 1',
-          entity: 'task',
-          entityId: task.TaskID,
-          field: 'Duration',
-          row: index + 1,
-          suggestion: 'Set Duration to 1 or higher'
-        });
-      }
-    });
-
-    // Validate MaxConcurrent
-    this.tasks.forEach((task, index) => {
-      if (task.MaxConcurrent < 1) {
-        errors.push({
-          type: 'error',
-          message: 'MaxConcurrent must be at least 1',
-          entity: 'task',
-          entityId: task.TaskID,
-          field: 'MaxConcurrent',
-          row: index + 1,
-          suggestion: 'Set MaxConcurrent to 1 or higher'
-        });
-      }
+    this.tasks.forEach((t, i) => {
+      if (t.Duration < 1) errors.push({ type: 'error', message: 'Duration must be >= 1', entity: 'task', entityId: t.TaskID, field: 'Duration', row: i + 1, suggestion: 'Increase Duration' });
+      if (t.MaxConcurrent < 1) errors.push({ type: 'error', message: 'MaxConcurrent must be >= 1', entity: 'task', entityId: t.TaskID, field: 'MaxConcurrent', row: i + 1, suggestion: 'Increase MaxConcurrent' });
     });
 
     return errors;
@@ -209,43 +103,21 @@ export class ValidationEngine {
 
   private validateCrossReferences(): ValidationError[] {
     const errors: ValidationError[] = [];
+    const taskIds = this.tasks.map(t => t.TaskID);
+    const allSkills = this.workers.flatMap(w => w.Skills.split(',').map(s => s.trim()));
 
-    // Check if RequestedTaskIDs exist in tasks
-    this.clients.forEach((client, index) => {
-      const requestedTasks = client.RequestedTaskIDs.split(',').map(id => id.trim());
-      const taskIds = this.tasks.map(t => t.TaskID);
-      
-      requestedTasks.forEach(taskId => {
-        if (taskId && !taskIds.includes(taskId)) {
-          errors.push({
-            type: 'error',
-            message: `Requested task ${taskId} does not exist`,
-            entity: 'client',
-            entityId: client.ClientID,
-            field: 'RequestedTaskIDs',
-            row: index + 1,
-            suggestion: `Remove or replace task ID: ${taskId}`
-          });
+    this.clients.forEach((c, i) => {
+      c.RequestedTaskIDs.split(',').map(id => id.trim()).forEach(tid => {
+        if (tid && !taskIds.includes(tid)) {
+          errors.push({ type: 'error', message: `Requested TaskID ${tid} not found`, entity: 'client', entityId: c.ClientID, field: 'RequestedTaskIDs', row: i + 1, suggestion: `Check task ID: ${tid}` });
         }
       });
     });
 
-    // Check if RequiredSkills are covered by workers
-    this.tasks.forEach((task, index) => {
-      const requiredSkills = task.RequiredSkills.split(',').map(skill => skill.trim());
-      const availableSkills = this.workers.flatMap(w => w.Skills.split(',').map(skill => skill.trim()));
-      
-      requiredSkills.forEach(skill => {
-        if (skill && !availableSkills.includes(skill)) {
-          errors.push({
-            type: 'error',
-            message: `Required skill ${skill} is not available in any worker`,
-            entity: 'task',
-            entityId: task.TaskID,
-            field: 'RequiredSkills',
-            row: index + 1,
-            suggestion: `Add worker with skill: ${skill} or remove skill requirement`
-          });
+    this.tasks.forEach((t, i) => {
+      t.RequiredSkills.split(',').map(s => s.trim()).forEach(skill => {
+        if (skill && !allSkills.includes(skill)) {
+          errors.push({ type: 'error', message: `Skill ${skill} missing in workers`, entity: 'task', entityId: t.TaskID, field: 'RequiredSkills', row: i + 1, suggestion: `Add worker with skill: ${skill}` });
         }
       });
     });
@@ -253,170 +125,70 @@ export class ValidationEngine {
     return errors;
   }
 
-  private validateClientWarnings(): ValidationError[] {
-    const warnings: ValidationError[] = [];
-
-    // Check for empty fields
-    this.clients.forEach((client, index) => {
-      if (!client.ClientName.trim()) {
-        warnings.push({
-          type: 'warning',
-          message: 'ClientName is empty',
-          entity: 'client',
-          entityId: client.ClientID,
-          field: 'ClientName',
-          row: index + 1,
-          suggestion: 'Provide a meaningful client name'
-        });
-      }
-    });
-
-    return warnings;
+  private clientWarnings(): ValidationError[] {
+    return this.clients.map((c, i) => !c.ClientName.trim() ? {
+      type: 'warning', message: 'ClientName is empty', entity: 'client', entityId: c.ClientID, field: 'ClientName', row: i + 1, suggestion: 'Provide a client name'
+    } : null).filter(Boolean) as ValidationError[];
   }
 
-  private validateWorkerWarnings(): ValidationError[] {
-    const warnings: ValidationError[] = [];
-
-    // Check for overloaded workers
-    this.workers.forEach((worker, index) => {
-      try {
-        const slots = JSON.parse(worker.AvailableSlots);
-        if (slots.length < worker.MaxLoadPerPhase) {
-          warnings.push({
-            type: 'warning',
-            message: `Worker has ${slots.length} available slots but MaxLoadPerPhase is ${worker.MaxLoadPerPhase}`,
-            entity: 'worker',
-            entityId: worker.WorkerID,
-            field: 'MaxLoadPerPhase',
-            row: index + 1,
-            suggestion: 'Reduce MaxLoadPerPhase or increase AvailableSlots'
-          });
-        }
-      } catch {
-        // Already handled in error validation
+  private workerWarnings(): ValidationError[] {
+    return this.workers.map((w, i) => {
+      const slots = this.parseJsonArray(w.AvailableSlots);
+      if (slots && slots.length < w.MaxLoadPerPhase) {
+        return {
+          type: 'warning', message: `Worker has fewer slots (${slots.length}) than MaxLoadPerPhase (${w.MaxLoadPerPhase})`, entity: 'worker', entityId: w.WorkerID, field: 'MaxLoadPerPhase', row: i + 1, suggestion: 'Adjust slot count or MaxLoadPerPhase'
+        };
       }
-    });
-
-    return warnings;
+      return null;
+    }).filter(Boolean) as ValidationError[];
   }
 
-  private validateTaskWarnings(): ValidationError[] {
-    const warnings: ValidationError[] = [];
-
-    // Check PreferredPhases format
-    this.tasks.forEach((task, index) => {
-      if (task.PreferredPhases) {
+  private taskWarnings(): ValidationError[] {
+    return this.tasks.map((t, i) => {
+      if (t.PreferredPhases) {
         try {
-          // Try to parse as JSON array
-          JSON.parse(task.PreferredPhases);
+          JSON.parse(t.PreferredPhases);
         } catch {
-          // Check if it's a range format like "1-3"
-          if (!/^\d+-\d+$/.test(task.PreferredPhases)) {
-            warnings.push({
-              type: 'warning',
-              message: 'PreferredPhases format may be invalid',
-              entity: 'task',
-              entityId: task.TaskID,
-              field: 'PreferredPhases',
-              row: index + 1,
-              suggestion: 'Use JSON array format [1,2,3] or range format "1-3"'
-            });
+          if (!/^\d+-\d+$/.test(t.PreferredPhases)) {
+            return { type: 'warning', message: 'PreferredPhases format may be invalid', entity: 'task', entityId: t.TaskID, field: 'PreferredPhases', row: i + 1, suggestion: 'Use [1,2,3] or range "1-3"' };
           }
         }
       }
-    });
-
-    return warnings;
+      return null;
+    }).filter(Boolean) as ValidationError[];
   }
 
-  private validateClientInfo(): ValidationError[] {
-    const info: ValidationError[] = [];
-
-    // Check for high priority clients with many tasks
-    this.clients.forEach((client, index) => {
-      const taskCount = client.RequestedTaskIDs.split(',').filter(id => id.trim()).length;
-      if (client.PriorityLevel >= 4 && taskCount > 5) {
-        info.push({
-          type: 'info',
-          message: `High priority client (${client.PriorityLevel}) has ${taskCount} requested tasks`,
-          entity: 'client',
-          entityId: client.ClientID,
-          field: 'RequestedTaskIDs',
-          row: index + 1,
-          suggestion: 'Consider task prioritization for high-priority clients'
-        });
+  private clientInfo(): ValidationError[] {
+    return this.clients.map((c, i) => {
+      const count = c.RequestedTaskIDs.split(',').filter(Boolean).length;
+      if (c.PriorityLevel >= 4 && count > 5) {
+        return { type: 'info', message: `High-priority client with ${count} tasks`, entity: 'client', entityId: c.ClientID, field: 'RequestedTaskIDs', row: i + 1, suggestion: 'Consider prioritizing tasks' };
       }
-    });
-
-    return info;
+      return null;
+    }).filter(Boolean) as ValidationError[];
   }
 
-  private validateWorkerInfo(): ValidationError[] {
-    const info: ValidationError[] = [];
-
-    // Check for workers with many skills
-    this.workers.forEach((worker, index) => {
-      const skillCount = worker.Skills.split(',').filter(skill => skill.trim()).length;
-      if (skillCount > 5) {
-        info.push({
-          type: 'info',
-          message: `Worker has ${skillCount} skills - consider specialization`,
-          entity: 'worker',
-          entityId: worker.WorkerID,
-          field: 'Skills',
-          row: index + 1,
-          suggestion: 'Consider focusing on core skills for better efficiency'
-        });
-      }
-    });
-
-    return info;
+  private workerInfo(): ValidationError[] {
+    return this.workers.map((w, i) => {
+      const count = w.Skills.split(',').filter(Boolean).length;
+      return count > 5 ? {
+        type: 'info', message: `Worker has ${count} skills`, entity: 'worker', entityId: w.WorkerID, field: 'Skills', row: i + 1, suggestion: 'Consider specialization' } : null;
+    }).filter(Boolean) as ValidationError[];
   }
 
-  private validateTaskInfo(): ValidationError[] {
-    const info: ValidationError[] = [];
-
-    // Check for long-duration tasks
-    this.tasks.forEach((task, index) => {
-      if (task.Duration > 5) {
-        info.push({
-          type: 'info',
-          message: `Task has long duration (${task.Duration} phases)`,
-          entity: 'task',
-          entityId: task.TaskID,
-          field: 'Duration',
-          row: index + 1,
-          suggestion: 'Consider breaking down long tasks for better resource allocation'
-        });
-      }
-    });
-
-    return info;
+  private taskInfo(): ValidationError[] {
+    return this.tasks.map((t, i) => t.Duration > 5 ? {
+      type: 'info', message: `Long-duration task (${t.Duration})`, entity: 'task', entityId: t.TaskID, field: 'Duration', row: i + 1, suggestion: 'Break down long task if needed'
+    } : null).filter(Boolean) as ValidationError[];
   }
 
-  private validateCrossReferenceWarnings(): ValidationError[] {
-    const warnings: ValidationError[] = [];
-
-    // Check for tasks with high concurrency but few qualified workers
-    this.tasks.forEach((task, index) => {
-      const requiredSkills = task.RequiredSkills.split(',').map(skill => skill.trim());
-      const qualifiedWorkers = this.workers.filter(worker => 
-        requiredSkills.some(skill => worker.Skills.includes(skill))
-      );
-      
-      if (task.MaxConcurrent > qualifiedWorkers.length) {
-        warnings.push({
-          type: 'warning',
-          message: `Task requires ${task.MaxConcurrent} concurrent workers but only ${qualifiedWorkers.length} are qualified`,
-          entity: 'task',
-          entityId: task.TaskID,
-          field: 'MaxConcurrent',
-          row: index + 1,
-          suggestion: 'Reduce MaxConcurrent or add more qualified workers'
-        });
-      }
-    });
-
-    return warnings;
+  private crossRefWarnings(): ValidationError[] {
+    return this.tasks.map((t, i) => {
+      const skills = t.RequiredSkills.split(',').map(s => s.trim());
+      const qualified = this.workers.filter(w => skills.some(skill => w.Skills.includes(skill)));
+      return t.MaxConcurrent > qualified.length ? {
+        type: 'warning', message: `MaxConcurrent ${t.MaxConcurrent} > qualified workers (${qualified.length})`, entity: 'task', entityId: t.TaskID, field: 'MaxConcurrent', row: i + 1, suggestion: 'Reduce concurrency or hire more qualified workers'
+      } : null;
+    }).filter(Boolean) as ValidationError[];
   }
-} 
+}
